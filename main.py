@@ -52,6 +52,8 @@ class ShowStandableGround(bpy.types.Operator):
                 # the first vertex, the second to the first,
                 # and the third to the second
 
+            # TODO: figure out how to convert faces to mesh
+
             if not too_steep:
                 standable_faces.append(face)
 
