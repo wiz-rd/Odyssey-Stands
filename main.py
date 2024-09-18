@@ -1,6 +1,7 @@
 bl_info = {
     "name": "Show Mario Stand",
     "blender": (2, 80, 0),
+    "location": "Right 3d View Panel -> Blender Addon",
     "category": "Object",
 }
 
@@ -9,6 +10,7 @@ from math import degrees
 import bpy
 import bmesh
 from mathutils import Vector
+from bpy.props import IntProperty
 
 
 class ShowStandableGround(bpy.types.Operator):
@@ -16,6 +18,8 @@ class ShowStandableGround(bpy.types.Operator):
     bl_idname = "object.show_standable_ground"
     bl_label = "Show Standable Ground"
     bl_options = {"REGISTER", "UNDO"}
+    bl_category = "Tools"
+    max_steepness : IntProperty(name="Max Allowed Steepness", description="Max Allowed Steepness (in degrees)", default=45, min=0, max=360)
 
 
     # create a material to assign to the faces
@@ -26,13 +30,24 @@ class ShowStandableGround(bpy.types.Operator):
         mat.diffuse_color = diffuse_color
         return mat
 
+    def set_steepness(self, steepness: int):
+        """
+        Sets the max steepness acceptable.
+        """
+        self.max_steepness = steepness
+
+    def draw(self, context):
+        row = self.layout
+        row.prop(self, "max_steepness", text="Max Steepness")
+
+
     def execute(self, context):
         # max steepness of slope in degrees
         # when compared to global z
         # global rotation is counted,
         # so faces "facing" downwards are
         # considered "too steep"
-        MAX_STEEPNESS = 45
+        MAX_STEEPNESS = self.max_steepness
 
         # the global z vector. Maybe Blender
         # has one by default but it's not hard to add
@@ -125,16 +140,41 @@ class ShowStandableGround(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class StandableGroundPanel(bpy.types.Panel):
+    bl_idname = "UV_PT_standable_ground"
+    bl_label = "Standable Ground"
+    bl_space_type = "VIEW_3D"   
+    bl_region_type = "UI"
+    bl_category = "Standable Ground"
+    bl_context = "objectmode"
+
+    @classmethod
+    def poll(self, context):
+        return context.object
+
+    def draw(self, context):
+        print("\n" * 5)
+        layout = self.layout
+        layout.label(text="Scan Ground")
+        # max_steepness : IntProperty(name="Max Steepness", description="Max Steepness (in degrees)", default=45, min=0, max=360)
+
+        layout.label(text="""Click "Process" to display standable ground.""")
+        # layout.prop(max_steepness, "max_steepness", text="Max Steepness (in degrees)")
+        # layout.operator(ShowStandableGround.set_steepness, text="Apply Steepness", icon="CONSOLE")
+        layout.operator(ShowStandableGround.bl_idname, text="Process Ground", icon="SHADING_WIRE")
+
+
 def menu_func(self, context):
     self.layout.operator(ShowStandableGround.bl_idname)
 
 def register():
     bpy.utils.register_class(ShowStandableGround)
+    bpy.utils.register_class(StandableGroundPanel)
     bpy.types.VIEW3D_MT_object.append(menu_func)  # Adds the new operator to an existing menu.
 
 def unregister():
     bpy.utils.unregister_class(ShowStandableGround)
-
+    bpy.utils.unregister_class(StandableGroundPanel)
 
 # This allows you to run the script directly from Blender's Text editor
 # to test the add-on without having to install it.
