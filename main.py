@@ -132,6 +132,8 @@ class ShowStandableGround(bpy.types.Operator):
         for face in not_standable_faces:
             # setting face colors to red
             new_obj.data.polygons[face].material_index = 1
+            # hide the faces in edit mode
+            new_obj.data.polygons[face].hide = True
 
         # for face in standable_faces U not_standable_faces:
         #     print(f"We have a problem. Face {face} is in both sets.")
