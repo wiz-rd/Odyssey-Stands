@@ -6,6 +6,7 @@ bl_info = {
 
 import bpy
 import bmesh
+import numpy as np
 
 
 class ShowStandableGround(bpy.types.Operator):
@@ -14,22 +15,54 @@ class ShowStandableGround(bpy.types.Operator):
     bl_label = "Show Standable Ground"
     bl_options = {"REGISTER", "UNDO"}
 
+
+    # create a material to assign to the faces
+    # thank you:
+    # https://blender.stackexchange.com/a/240875
+    def create_material(self, mat_name, diffuse_color=(1,1,1,1)):
+        mat = bpy.data.materials.new(name=mat_name)
+        mat.diffuse_color = diffuse_color
+        return mat
+
     def execute(self, context):
-        MAX_STEEPNESS = 10
-        obj = context.active_object
+        MAX_STEEPNESS = 0.5
+        # store original object to hide later
+        # (because we can't hide it and it still be selected)
+        original_obj = context.active_object
+        # duplicate original/selected object
+        bpy.ops.object.duplicate(linked=0,mode='TRANSLATION')
+        # hide original object
+        original_obj.hide_set(True)
+        # store the new object in a variable
+        new_obj = context.active_object
+        new_obj.name = "StandableGround"
+
+        green_mat = self.create_material("StandableGreen", (0, 1, 0, 1))
+        red_mat = self.create_material("NonstandableRed", (1, 0, 0, 1))
+
+        # if no materials exist, add them
+        if len(new_obj.materials) == 0:
+            new_obj.data.materials.append(green_mat)
+        # if only green exists, add red
+        if len(new_obj.materials) == 1:
+            new_obj.data.materials.append(red_mat)
+
+        # get the data for that object
+        new_obj_mesh = new_obj.to_mesh(preserve_all_data_layers=True)
+        # "globalize" the data. Not sure if this is necessary anymore
+        # as I removed manual calculation of face normals
+        new_obj_mesh.transform(new_obj.matrix_world)
 
         # create a new mesh object (not in the editor)
         # to give us access to additional
         # data and data types
         bm = bmesh.new()
-        bm.from_mesh(obj.data)
+        bm.from_mesh(new_obj_mesh)
         bm.faces.ensure_lookup_table()
 
-        # TODO: add additional logic here
-        # to detect the baremost part that Mario
-        # can stand on
-
-        standable_faces = []
+        print()
+        standable_faces = set()
+        not_standable_faces = set()
 
         # get all vertices of each face
         for face in bm.faces:
@@ -38,26 +71,27 @@ class ShowStandableGround(bpy.types.Operator):
             # of each face
             too_steep = False
 
-            for i in range(0, 2):
-                # if the absolute value of the current vertex's
-                # z coordinate MINUS the z coordinate
-                # of the previous vertex is greater than
-                # the threshhold, mark it as too steep
-                if abs(face.verts[i].co[3] - face.verts[i - 1].co[3]) > MAX_STEEPNESS:
-                    too_steep = True
-                    break
-
-                # values of i - 1 should be -1, 0, 1
-                # so that way the last one is compared to
-                # the first vertex, the second to the first,
-                # and the third to the second
-
-            # TODO: figure out how to convert faces to mesh
+            print(face.normal.z)
+            print(f"is too steep: {face.normal.z > MAX_STEEPNESS}")
 
             if not too_steep:
-                standable_faces.append(face)
+                print(f"Appended {face} to highlight list.")
+                # appending the face to the list to be highlighted
+                standable_faces.add(face.index)
+            else:
+                not_standable_faces.add(face.index)
 
-        bm.to_mesh(standable_faces)
+        for face in standable_faces:
+            # setting face colors to green
+            new_obj.data.polygons[face].material_index = 1
+
+        for face in not_standable_faces:
+            # setting face colors to red
+            new_obj.data.polygons[face].material_index = 2
+
+        # bmesh.ops.delete(bm, geom=selected_faces, context="FACES")
+        # bm.to_mesh(new_obj_mesh)
+        # new_obj.update_from_editmode()
 
         return {"FINISHED"}
 
@@ -77,5 +111,3 @@ def unregister():
 # to test the add-on without having to install it.
 if __name__ == "__main__":
     register()
-
-
